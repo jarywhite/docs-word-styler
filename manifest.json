@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "description": "Style specific words and phrases in Google Docs",
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "storage",
+    "scripting"
   ],
   "host_permissions": [
     "https://docs.google.com/*",
