@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extension Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .editable {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 100px;
+            background: #f9f9f9;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        h1 { color: #1976d2; }
+        h2 { color: #424242; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Docs Word Styler Extension Test Page</h1>
+    
+    <div class="instructions">
+        <h2>📋 Test Instructions</h2>
+        <ol>
+            <li><strong>Select text</strong> in any editable area below</li>
+            <li><strong>Open the extension</strong> (click the extension icon)</li>
+            <li><strong>Enter the selected word</strong> in the extension popup</li>
+            <li><strong>Choose formatting options</strong> (bold, italic, underline)</li>
+            <li><strong>Click "Apply Styles"</strong></li>
+            <li><strong>Check if formatting was applied</strong> to your selected text</li>
+        </ol>
+    </div>
+
+    <h2>🎯 Test Area 1: ContentEditable Div</h2>
+    <div class="editable" contenteditable="true">
+        This is a contenteditable div. You can select the word "person" here and test the extension. 
+        The average person uses their phone about 2,600 times every day. Try selecting "person" and applying bold, italic, underline formatting.
+    </div>
+
+    <h2>🎯 Test Area 2: Textarea</h2>
+    <textarea class="editable" rows="6" cols="80">
+This is a textarea element. Select the word "person" and test the extension.
+The average person taps their phone about 2,600 times every day. 
+You can also try selecting other words like "phone" or "day".
+    </textarea>
+
+    <h2>🎯 Test Area 3: Input Field</h2>
+    <input type="text" class="editable" value="Select person in this input field and test formatting" style="width: 100%; padding: 10px; font-size: 16px;">
+
+    <h2>🎯 Test Area 4: Regular Text (Non-editable)</h2>
+    <div class="editable" style="border-color: #ff9800; background: #fff3e0;">
+        <p>This is regular text that you can select but not edit. Try selecting "person" here to see if the extension can detect standard text selection.</p>
+        <p>The average person checks their email 74 times per day. Does the extension work on non-editable text?</p>
+    </div>
+
+    <div class="instructions">
+        <h2>✅ Expected Results</h2>
+        <ul>
+            <li><strong>ContentEditable & Textarea:</strong> Should work perfectly with standard selection</li>
+            <li><strong>Input Field:</strong> May have limited formatting support</li>
+            <li><strong>Regular Text:</strong> Selection should be detected but formatting may not apply</li>
+        </ul>
+        
+        <h2>🐛 Debugging</h2>
+        <p><strong>Open Chrome DevTools Console</strong> to see detailed logs from the extension about what text is being detected and which formatting methods are being used.</p>
+    </div>
+
+    <script>
+        // Add some basic functionality for testing
+        document.querySelectorAll('.editable').forEach(element => {
+            element.addEventListener('mouseup', () => {
+                const selection = window.getSelection();
+                const selectedText = selection.toString();
+                if (selectedText.trim()) {
+                    console.log(`Text selected: "${selectedText}"`);
+                }
+            });
+        });
+
+        // Log when the page loads
+        console.log('Extension test page loaded. Ready for testing!');
+    </script>
+</body>
+</html>
