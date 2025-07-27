@@ -15,18 +15,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Try to get current selection info
-  try {
-    const response = await chrome.tabs.sendMessage(tab.id, { action: 'captureSelection' });
-    if (response && response.selection && response.selection.text) {
-      phraseInput.value = response.selection.text;
-      phraseInput.placeholder = `Selected: "${response.selection.text}"`;
-    }
-  } catch (error) {
-    console.log('Could not get selection:', error);
-  }
+  // Update button text to reflect the actual functionality
+  applyButton.textContent = 'Format All Instances';
+
+  // Set focus on phrase input
+  phraseInput.focus();
+  phraseInput.placeholder = 'Enter word to format (e.g., "dopamine")';
 
   applyButton.addEventListener('click', async () => {
+    const phrase = phraseInput.value.trim();
+    if (!phrase) {
+      alert('Please enter a word or phrase to format throughout the document.');
+      return;
+    }
+
     const styles = {
       bold: boldCheckbox.checked,
       italic: italicCheckbox.checked,
@@ -40,31 +42,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      // Send formatting command using proven method
+      // Send the find and format all instances command
       const response = await chrome.tabs.sendMessage(tab.id, {
-        action: 'applyFormatting',
-        styles
+        action: 'formatAllInstances',
+        phrase: phrase,
+        styles: styles
       });
 
       if (response && response.success) {
-        // Show success and close popup
+        // Show success message
         const appliedStyles = Object.keys(styles).filter(k => styles[k]).join(', ');
+        alert(`✅ Applying ${appliedStyles} formatting to all instances of "${phrase}"!\n\nWatch Google Docs for the Find & Replace dialog.`);
         
         // Close popup after brief delay
         setTimeout(() => {
           window.close();
-        }, 800);
+        }, 1000);
       } else {
-        alert('Could not apply formatting. Please select text in Google Docs first.');
+        alert('Could not start formatting process. Please try again.');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error applying styles. Make sure you are on a Google Docs page and have text selected.');
+      alert('Error applying styles. Make sure you are on a Google Docs page.');
     }
   });
 
-  // Auto-focus on phrase input if empty
-  if (!phraseInput.value) {
-    phraseInput.focus();
-  }
+  // Allow Enter key to trigger formatting
+  phraseInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      applyButton.click();
+    }
+  });
 });
