@@ -52,20 +52,46 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response && response.success) {
         // Show success message
         const appliedStyles = Object.keys(styles).filter(k => styles[k]).join(', ');
-        alert(`✅ Applying ${appliedStyles} formatting to all instances of "${phrase}"!\n\nWatch Google Docs for the Find & Replace dialog.`);
+        alert(`🚀 Starting ${appliedStyles} formatting for all instances of "${phrase}"!\n\nWatch the console for progress and Google Docs for the automation.`);
         
         // Close popup after brief delay
         setTimeout(() => {
           window.close();
-        }, 1000);
+        }, 1500);
       } else {
-        alert('Could not start formatting process. Please try again.');
+        alert('Could not start formatting process. Check the console for debug info.');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error applying styles. Make sure you are on a Google Docs page.');
+      alert('Error applying styles. Make sure you are on a Google Docs page and check the console.');
     }
   });
+
+  // Add debug button for development
+  const debugButton = document.createElement('button');
+  debugButton.textContent = 'Debug Buttons';
+  debugButton.style.cssText = `
+    width: 100%;
+    padding: 8px;
+    margin-top: 10px;
+    background: #666;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  `;
+  debugButton.addEventListener('click', async () => {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { action: 'debugButtons' });
+      alert('Check the console for button debug info');
+    } catch (error) {
+      alert('Debug failed: ' + error.message);
+    }
+  });
+  
+  // Add debug button after the main button
+  applyButton.parentNode.appendChild(debugButton);
 
   // Allow Enter key to trigger formatting
   phraseInput.addEventListener('keydown', (e) => {

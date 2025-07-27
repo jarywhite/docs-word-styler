@@ -1,235 +1,332 @@
-console.log('Docs Word Styler v3.0 - Find & Format All Instances');
+console.log('Docs Word Styler v4.0 - UI Button Clicking Approach');
 
-// Main function to find and format all instances of a word
-function findAndFormatAllInstances(phrase, styles) {
-  console.log(`🔍 Searching for ALL instances of "${phrase}" to apply:`, styles);
-  
-  const win = getDocsIframe();
-  if (!win) {
-    showNotification('Could not access Google Docs. Please ensure you are on a Google Docs page.', true);
-    return false;
-  }
+// Google Docs toolbar button selectors (based on research)
+const GOOGLE_DOCS_BUTTONS = {
+  bold: [
+    '#boldButton',
+    '[aria-label*="Bold"]',
+    '[data-tooltip*="Bold"]',
+    '.docs-icon-bold',
+    '[role="button"][aria-label*="Bold"]'
+  ],
+  italic: [
+    '#italicButton', 
+    '[aria-label*="Italic"]',
+    '[data-tooltip*="Italic"]',
+    '.docs-icon-italic',
+    '[role="button"][aria-label*="Italic"]'
+  ],
+  underline: [
+    '#underlineButton',
+    '[aria-label*="Underline"]', 
+    '[data-tooltip*="Underline"]',
+    '.docs-icon-underline',
+    '[role="button"][aria-label*="Underline"]'
+  ],
+  findReplace: [
+    '[aria-label*="Find and replace"]',
+    '[data-tooltip*="Find and replace"]',
+    '.docs-icon-find-replace'
+  ]
+};
 
-  // Focus the Google Docs iframe
-  focusDocsIframe(win);
+// Find a button using multiple selectors
+function findButton(buttonType) {
+  const selectors = GOOGLE_DOCS_BUTTONS[buttonType];
+  if (!selectors) return null;
   
-  // Use Google Docs' native Find & Replace functionality
-  setTimeout(() => {
-    openFindReplaceAndFormat(win, phrase, styles);
-  }, 300);
-  
-  return true;
-}
-
-// Get Google Docs iframe window
-function getDocsIframe() {
-  const iframe = document.querySelector('iframe.docs-texteventtarget-iframe');
-  if (iframe && iframe.contentWindow) {
-    return iframe.contentWindow;
-  }
-  
-  // Fallback: look for any iframe that might contain the editor
-  const iframes = document.querySelectorAll('iframe');
-  for (let frame of iframes) {
-    try {
-      if (frame.contentWindow && frame.contentWindow.document) {
-        const hasEditor = frame.contentWindow.document.querySelector('[role="textbox"]') ||
-                         frame.contentWindow.document.querySelector('.kix-appview-editor');
-        if (hasEditor) {
-          return frame.contentWindow;
-        }
-      }
-    } catch (e) {
-      continue;
+  for (const selector of selectors) {
+    const button = document.querySelector(selector);
+    if (button) {
+      console.log(`Found ${buttonType} button using selector: ${selector}`);
+      return button;
     }
   }
   
-  return window;
+  console.log(`Could not find ${buttonType} button`);
+  return null;
 }
 
-// Focus the Google Docs iframe properly
-function focusDocsIframe(win) {
+// Click a Google Docs toolbar button
+function clickGoogleDocsButton(buttonType) {
+  const button = findButton(buttonType);
+  if (!button) {
+    console.log(`❌ ${buttonType} button not found`);
+    return false;
+  }
+  
   try {
-    win.focus();
+    // Focus the button first
+    button.focus();
     
-    const targets = [
-      win.document.querySelector('[role="textbox"]'),
-      win.document.querySelector('.kix-appview-editor'),
-      win.document.activeElement,
-      win.document.body
-    ].filter(el => el);
+    // Try multiple click methods
+    button.click();
     
-    targets.forEach(target => {
-      try {
-        target.focus();
-        if (target.click) target.click();
-      } catch (e) {
-        console.log('Focus attempt failed:', e);
-      }
+    // Also dispatch mouse events as backup
+    const mouseEvent = new MouseEvent('click', {
+      view: window,
+      bubbles: true,
+      cancelable: true,
+      button: 0
     });
+    button.dispatchEvent(mouseEvent);
     
+    console.log(`✅ Clicked ${buttonType} button successfully`);
     return true;
   } catch (error) {
-    console.log('Focus error:', error);
+    console.log(`❌ Failed to click ${buttonType} button:`, error);
     return false;
   }
 }
 
-// Open Find & Replace and apply formatting to all instances
-function openFindReplaceAndFormat(win, phrase, styles) {
-  console.log(`📝 Using Find & Replace approach for "${phrase}"`);
+// Open Find & Replace using UI clicking
+function openFindAndReplace() {
+  console.log('🔍 Opening Find & Replace dialog...');
   
-  // Step 1: Open Find & Replace with Ctrl+H
-  sendKeySequence(win, 'h', 'KeyH', true);
+  // Try to find and click Find & Replace button
+  const findReplaceButton = findButton('findReplace');
+  if (findReplaceButton) {
+    return clickGoogleDocsButton('findReplace');
+  }
   
+  // Fallback: try keyboard shortcut
+  console.log('Find & Replace button not found, trying Ctrl+H');
+  const event = new KeyboardEvent('keydown', {
+    key: 'h',
+    code: 'KeyH',
+    ctrlKey: true,
+    bubbles: true,
+    cancelable: true
+  });
+  
+  document.dispatchEvent(event);
+  return true;
+}
+
+// Find and format all instances using UI automation
+function formatAllInstancesViaUI(phrase, styles) {
+  console.log(`🎯 Formatting all instances of "${phrase}" using UI automation`);
+  
+  // Step 1: Open Find & Replace
+  if (!openFindAndReplace()) {
+    showNotification('Could not open Find & Replace dialog', true);
+    return false;
+  }
+  
+  // Wait for dialog to open
   setTimeout(() => {
-    // Step 2: Enter the search phrase
-    typeText(win, phrase);
+    // Step 2: Type the search phrase
+    typeInActiveField(phrase);
     
     setTimeout(() => {
-      // Step 3: Tab to "Replace with" field and enter the same phrase
-      sendKeySequence(win, 'Tab', 'Tab', false);
+      // Step 3: Move to replace field (Tab key)
+      pressTab();
       
       setTimeout(() => {
-        typeText(win, phrase);
+        // Step 4: Type the replacement phrase
+        typeInActiveField(phrase);
         
         setTimeout(() => {
-          // Step 4: Apply formatting to the replacement text
-          selectAllInField(win);
+          // Step 5: Select the replacement text
+          selectAllInActiveField();
           
           setTimeout(() => {
-            // Apply the requested formatting
+            // Step 6: Apply formatting by clicking toolbar buttons
             if (styles.bold) {
-              sendKeySequence(win, 'b', 'KeyB', true);
-              console.log('Applied bold formatting to replacement');
+              clickGoogleDocsButton('bold');
             }
             
-            if (styles.italic) {
-              setTimeout(() => {
-                sendKeySequence(win, 'i', 'KeyI', true);
-                console.log('Applied italic formatting to replacement');
-              }, 100);
-            }
-            
-            if (styles.underline) {
-              setTimeout(() => {
-                sendKeySequence(win, 'u', 'KeyU', true);
-                console.log('Applied underline formatting to replacement');
-              }, 200);
-            }
-            
-            // Step 5: Replace all instances
             setTimeout(() => {
-              replaceAll(win);
+              if (styles.italic) {
+                clickGoogleDocsButton('italic');
+              }
               
               setTimeout(() => {
-                closeFindReplace(win);
-                showNotification(`✅ Applied formatting to all instances of "${phrase}"!`);
-              }, 500);
+                if (styles.underline) {
+                  clickGoogleDocsButton('underline');
+                }
+                
+                setTimeout(() => {
+                  // Step 7: Replace all
+                  replaceAllViaUI();
+                  
+                  setTimeout(() => {
+                    // Step 8: Close dialog
+                    closeFindReplaceDialog();
+                    showNotification(`✅ Applied formatting to all instances of "${phrase}"!`);
+                  }, 500);
+                  
+                }, 200);
+                
+              }, 200);
               
-            }, 400);
+            }, 200);
             
-          }, 200);
+          }, 300);
           
         }, 300);
         
       }, 300);
       
-    }, 300);
+    }, 500);
     
-  }, 500);
+  }, 700); // Give time for dialog to open
+  
+  return true;
 }
 
-// Send keyboard event sequence
-function sendKeySequence(win, key, code, ctrlKey = false) {
-  const events = ['keydown', 'keyup'];
+// Type text in the currently active field
+function typeInActiveField(text) {
+  const activeElement = document.activeElement;
+  if (!activeElement) {
+    console.log('No active element found for typing');
+    return;
+  }
   
-  events.forEach((eventType, index) => {
-    setTimeout(() => {
-      const keyEvent = new KeyboardEvent(eventType, {
-        key: key,
-        code: code,
-        ctrlKey: ctrlKey,
-        metaKey: ctrlKey && navigator.platform.includes('Mac'),
-        bubbles: true,
-        cancelable: true,
-        composed: true
-      });
-      
-      try {
-        const targets = [
-          win.document.querySelector('[role="textbox"]'),
-          win.document.activeElement,
-          win.document
-        ].filter(el => el);
-        
-        targets.forEach(target => {
-          target.dispatchEvent(keyEvent);
-        });
-        
-        console.log(`Sent ${eventType} ${key} to Google Docs`);
-      } catch (e) {
-        console.log(`Failed to send ${eventType}:`, e);
-      }
-    }, index * 10);
-  });
+  console.log(`Typing "${text}" in active field`);
+  
+  // Set the value
+  if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') {
+    activeElement.value = text;
+    
+    // Trigger input events
+    activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+    activeElement.dispatchEvent(new Event('change', { bubbles: true }));
+  } else {
+    // For contenteditable elements
+    activeElement.textContent = text;
+    
+    // Trigger input event
+    activeElement.dispatchEvent(new InputEvent('input', {
+      data: text,
+      inputType: 'insertText',
+      bubbles: true
+    }));
+  }
 }
 
-// Type text into the active field
-function typeText(win, text) {
-  console.log(`Typing: "${text}"`);
-  
-  const inputEvent = new InputEvent('input', {
-    data: text,
-    inputType: 'insertText',
+// Press Tab key to move between fields
+function pressTab() {
+  console.log('Pressing Tab key');
+  const tabEvent = new KeyboardEvent('keydown', {
+    key: 'Tab',
+    code: 'Tab',
     bubbles: true,
     cancelable: true
   });
   
-  try {
-    const activeElement = win.document.activeElement;
-    if (activeElement) {
-      // Set the value
-      if (activeElement.value !== undefined) {
-        activeElement.value = text;
-      } else {
-        activeElement.textContent = text;
-      }
-      
-      // Dispatch input event
-      activeElement.dispatchEvent(inputEvent);
-      console.log(`Typed "${text}" into active field`);
-    }
-  } catch (e) {
-    console.log('Failed to type text:', e);
-  }
-}
-
-// Select all text in the current field
-function selectAllInField(win) {
-  sendKeySequence(win, 'a', 'KeyA', true);
-  console.log('Selected all text in field');
-}
-
-// Click "Replace All" button
-function replaceAll(win) {
-  // Try to find and click the Replace All button
-  const replaceAllButton = win.document.querySelector('[aria-label*="Replace all"], [data-tooltip*="Replace all"], button[title*="Replace all"]');
+  document.dispatchEvent(tabEvent);
   
-  if (replaceAllButton) {
-    replaceAllButton.click();
-    console.log('Clicked Replace All button');
-  } else {
-    // Fallback: try keyboard shortcut for Replace All
-    sendKeySequence(win, 'Enter', 'Enter', true);
-    console.log('Used keyboard shortcut for Replace All');
+  // Also try on active element
+  if (document.activeElement) {
+    document.activeElement.dispatchEvent(tabEvent);
   }
+}
+
+// Select all text in active field
+function selectAllInActiveField() {
+  console.log('Selecting all text in active field');
+  
+  const activeElement = document.activeElement;
+  if (activeElement) {
+    if (activeElement.select) {
+      activeElement.select();
+    } else {
+      // Try Ctrl+A
+      const selectAllEvent = new KeyboardEvent('keydown', {
+        key: 'a',
+        code: 'KeyA',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true
+      });
+      activeElement.dispatchEvent(selectAllEvent);
+    }
+  }
+}
+
+// Click Replace All button in Find & Replace dialog
+function replaceAllViaUI() {
+  console.log('Looking for Replace All button');
+  
+  // Try to find Replace All button
+  const replaceAllSelectors = [
+    '[aria-label*="Replace all"]',
+    '[data-tooltip*="Replace all"]',
+    'button[title*="Replace all"]',
+    '.docs-findandreplace-replace-all',
+    '[role="button"]:contains("Replace all")'
+  ];
+  
+  for (const selector of replaceAllSelectors) {
+    const button = document.querySelector(selector);
+    if (button) {
+      console.log(`Found Replace All button: ${selector}`);
+      button.click();
+      return;
+    }
+  }
+  
+  console.log('Replace All button not found, trying Alt+A');
+  // Fallback: Alt+A is often the shortcut for Replace All
+  const altAEvent = new KeyboardEvent('keydown', {
+    key: 'a',
+    code: 'KeyA',
+    altKey: true,
+    bubbles: true,
+    cancelable: true
+  });
+  document.dispatchEvent(altAEvent);
 }
 
 // Close Find & Replace dialog
-function closeFindReplace(win) {
-  sendKeySequence(win, 'Escape', 'Escape', false);
-  console.log('Closed Find & Replace dialog');
+function closeFindReplaceDialog() {
+  console.log('Closing Find & Replace dialog');
+  
+  // Try to find close button
+  const closeSelectors = [
+    '[aria-label*="Close"]',
+    '[data-tooltip*="Close"]',
+    '.docs-findandreplace-close',
+    '.modal-dialog-title-close'
+  ];
+  
+  for (const selector of closeSelectors) {
+    const button = document.querySelector(selector);
+    if (button) {
+      console.log(`Found close button: ${selector}`);
+      button.click();
+      return;
+    }
+  }
+  
+  // Fallback: Escape key
+  console.log('Close button not found, trying Escape key');
+  const escEvent = new KeyboardEvent('keydown', {
+    key: 'Escape',
+    code: 'Escape',
+    bubbles: true,
+    cancelable: true
+  });
+  document.dispatchEvent(escEvent);
+}
+
+// Debug function to list all available buttons
+function debugListAllButtons() {
+  console.log('🔍 DEBUG: Listing all buttons in Google Docs');
+  
+  const buttons = document.querySelectorAll('button, [role="button"]');
+  buttons.forEach((button, index) => {
+    console.log(`Button ${index}:`, {
+      id: button.id,
+      className: button.className,
+      ariaLabel: button.getAttribute('aria-label'),
+      tooltip: button.getAttribute('data-tooltip'),
+      textContent: button.textContent?.trim().substring(0, 50)
+    });
+  });
+  
+  console.log(`Found ${buttons.length} total buttons`);
 }
 
 // Enhanced notification system
@@ -274,24 +371,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   if (message.action === 'formatAllInstances') {
     const { phrase, styles } = message;
+    
     if (!phrase) {
       showNotification('Please enter a word or phrase to format.', true);
       sendResponse({ success: false });
       return;
     }
     
-    const success = findAndFormatAllInstances(phrase, styles);
+    // Debug: List all buttons first
+    debugListAllButtons();
+    
+    const success = formatAllInstancesViaUI(phrase, styles);
     sendResponse({ success });
+    
+  } else if (message.action === 'debugButtons') {
+    // Debug command to list buttons
+    debugListAllButtons();
+    sendResponse({ success: true });
   }
 });
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    console.log('Docs Word Styler v3.0 initialized - Find & Format All Instances');
+    console.log('Docs Word Styler v4.0 initialized - UI Button Clicking');
   });
 } else {
-  console.log('Docs Word Styler v3.0 initialized - Find & Format All Instances');
+  console.log('Docs Word Styler v4.0 initialized - UI Button Clicking');
 }
 
-console.log('Docs Word Styler v3.0 content script loaded successfully');
+console.log('Docs Word Styler v4.0 content script loaded successfully');
