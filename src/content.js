@@ -42,10 +42,7 @@ function captureSelection() {
         focusOffset: selection.focusOffset
       };
       
-      // Store in session storage for persistence across popup interactions
-      chrome.storage.session.set({
-        docsWordStylerSelection: storedSelection
-      });
+      // Storage handled locally to avoid access issues
       
       console.log('📝 Selection captured:', selectedText);
     }
@@ -114,44 +111,44 @@ function focusDocsIframe(win) {
 // Restore selection in the iframe
 function restoreSelection(win) {
   try {
-    // Get selection from session storage first
-    chrome.storage.session.get(['docsWordStylerSelection'], (result) => {
-      const savedSelection = result.docsWordStylerSelection || storedSelection;
+    // Use local storage instead of chrome.storage.session
+    const savedSelection = storedSelection;
+    
+    if (savedSelection && savedSelection.text && Date.now() - savedSelection.timestamp < 30000) {
+      console.log('Attempting to restore selection:', savedSelection.text);
       
-      if (savedSelection && savedSelection.text && Date.now() - savedSelection.timestamp < 30000) {
-        console.log('Attempting to restore selection:', savedSelection.text);
-        
-        // Try to restore the exact range if available
-        if (savedSelection.range) {
-          try {
-            const selection = win.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(savedSelection.range);
-            console.log('✅ Selection range restored');
-            return;
-          } catch (e) {
-            console.log('Range restoration failed, trying alternative methods');
-          }
-        }
-        
-        // Try to restore using stored selection coordinates
-        if (savedSelection.anchorNode && savedSelection.focusNode) {
-          try {
-            const selection = win.getSelection();
-            selection.setBaseAndExtent(
-              savedSelection.anchorNode,
-              savedSelection.anchorOffset,
-              savedSelection.focusNode,
-              savedSelection.focusOffset
-            );
-            console.log('✅ Selection coordinates restored');
-            return;
-          } catch (e) {
-            console.log('Coordinate restoration failed');
-          }
+      // Try to restore the exact range if available
+      if (savedSelection.range) {
+        try {
+          const selection = win.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(savedSelection.range);
+          console.log('✅ Selection range restored');
+          return;
+        } catch (e) {
+          console.log('Range restoration failed, trying alternative methods');
         }
       }
-    });
+      
+      // Try to restore using stored selection coordinates
+      if (savedSelection.anchorNode && savedSelection.focusNode) {
+        try {
+          const selection = win.getSelection();
+          selection.setBaseAndExtent(
+            savedSelection.anchorNode,
+            savedSelection.anchorOffset,
+            savedSelection.focusNode,
+            savedSelection.focusOffset
+          );
+          console.log('✅ Selection coordinates restored');
+          return;
+        } catch (e) {
+          console.log('Coordinate restoration failed');
+        }
+      }
+    }
+    
+    console.log('No valid selection to restore, proceeding with formatting');
   } catch (error) {
     console.log('Selection restoration error:', error);
   }
@@ -166,21 +163,32 @@ function sendSyntheticKeyEvent(win, key, code, ctrlKey = false) {
       key: key,
       code: code,
       ctrlKey: ctrlKey,
+      metaKey: ctrlKey, // Add metaKey for Mac compatibility
       bubbles: true,
       cancelable: true,
       composed: true
     });
     
     try {
-      // Send to the iframe document
-      win.document.dispatchEvent(keyEvent);
+      // Priority targets for Google Docs
+      const targets = [
+        win.document.querySelector('[role="textbox"]'),
+        win.document.querySelector('.kix-appview-editor'),
+        win.document.activeElement,
+        win.document.body,
+        win.document
+      ].filter(el => el);
       
-      // Also send to focused element within iframe
-      if (win.document.activeElement) {
-        win.document.activeElement.dispatchEvent(keyEvent);
-      }
+      // Send to all targets to ensure event reaches the right handler
+      targets.forEach((target, index) => {
+        try {
+          target.dispatchEvent(keyEvent);
+          console.log(`Sent ${eventType} ${key} to target ${index}:`, target.tagName || target.constructor.name);
+        } catch (e) {
+          console.log(`Failed to send ${eventType} to target ${index}:`, e);
+        }
+      });
       
-      console.log(`Sent ${eventType} ${key} to Google Docs iframe`);
     } catch (error) {
       console.log(`Failed to send ${eventType}:`, error);
     }
@@ -203,43 +211,35 @@ function applyFormatting(styles) {
     return false;
   }
   
-  // Wait for focus to settle, then restore selection
+  // Shorter delays and immediate formatting application
   setTimeout(() => {
-    console.log('Restoring selection...');
-    restoreSelection(win);
+    console.log('Applying formatting to current selection...');
     
-    // Wait a bit more for selection to settle, then apply formatting
-    setTimeout(() => {
-      console.log('Sending formatting commands...');
-      
-      let applied = [];
-      
-      if (styles.bold) {
-        sendSyntheticKeyEvent(win, 'b', 'KeyB', true);
-        applied.push('bold');
-      }
-      
-      if (styles.italic) {
-        setTimeout(() => {
-          sendSyntheticKeyEvent(win, 'i', 'KeyI', true);
-          applied.push('italic');
-        }, 100);
-      }
-      
-      if (styles.underline) {
-        setTimeout(() => {
-          sendSyntheticKeyEvent(win, 'u', 'KeyU', true);
-          applied.push('underline');
-        }, 200);
-      }
-      
-      if (applied.length > 0) {
-        showNotification(`✅ Applied ${applied.join(', ')} formatting to Google Docs!`);
-      }
-      
-    }, 100); // Wait for selection restoration
+    let applied = [];
     
-  }, 50); // Wait for focus to settle
+    // Apply all formatting simultaneously for better success rate
+    if (styles.bold) {
+      sendSyntheticKeyEvent(win, 'b', 'KeyB', true);
+      applied.push('bold');
+    }
+    
+    if (styles.italic) {
+      sendSyntheticKeyEvent(win, 'i', 'KeyI', true);
+      applied.push('italic');
+    }
+    
+    if (styles.underline) {
+      sendSyntheticKeyEvent(win, 'u', 'KeyU', true);
+      applied.push('underline');
+    }
+    
+    if (applied.length > 0) {
+      showNotification(`✅ Applied ${applied.join(', ')} formatting to selected text!`);
+    } else {
+      showNotification('Select text in Google Docs first, then use the extension.', true);
+    }
+    
+  }, 200); // Single delay for focus settling
   
   return true;
 }
