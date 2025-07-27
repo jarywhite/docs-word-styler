@@ -154,50 +154,119 @@ function restoreSelection(win) {
   }
 }
 
-// Send synthetic keyboard events to Google Docs iframe
+// Send synthetic keyboard events using the exact method successful extensions use
 function sendSyntheticKeyEvent(win, key, code, ctrlKey = false) {
-  const events = ['keydown', 'keyup'];
-  
-  events.forEach(eventType => {
-    const keyEvent = new KeyboardEvent(eventType, {
-      key: key,
-      code: code,
-      ctrlKey: ctrlKey,
-      metaKey: ctrlKey, // Add metaKey for Mac compatibility
-      bubbles: true,
-      cancelable: true,
-      composed: true
+  try {
+    // Get the primary textbox target
+    const textbox = win.document.querySelector('[role="textbox"]');
+    const editor = win.document.querySelector('.kix-appview-editor');
+    const activeElement = win.document.activeElement;
+    
+    // Use the most specific target first
+    const primaryTarget = textbox || editor || activeElement || win.document.body;
+    
+    // Create the exact key event sequence that Google Docs recognizes
+    const eventSequence = [
+      {
+        type: 'keydown',
+        options: {
+          key: key,
+          code: code,
+          keyCode: key.charCodeAt(0) - 32, // Convert to keyCode
+          which: key.charCodeAt(0) - 32,
+          ctrlKey: ctrlKey,
+          metaKey: ctrlKey && navigator.platform.includes('Mac'),
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          isTrusted: true
+        }
+      },
+      {
+        type: 'keypress', 
+        options: {
+          key: key,
+          code: code,
+          keyCode: key.charCodeAt(0) - 32,
+          which: key.charCodeAt(0) - 32,
+          ctrlKey: ctrlKey,
+          metaKey: ctrlKey && navigator.platform.includes('Mac'),
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          isTrusted: true
+        }
+      },
+      {
+        type: 'keyup',
+        options: {
+          key: key,
+          code: code,
+          keyCode: key.charCodeAt(0) - 32,
+          which: key.charCodeAt(0) - 32,
+          ctrlKey: ctrlKey,
+          metaKey: ctrlKey && navigator.platform.includes('Mac'),
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          isTrusted: true
+        }
+      }
+    ];
+    
+    // Send the complete sequence to the primary target
+    eventSequence.forEach((eventConfig, index) => {
+      setTimeout(() => {
+        try {
+          const event = new KeyboardEvent(eventConfig.type, eventConfig.options);
+          
+          // Try to make the event appear more "trusted" 
+          Object.defineProperty(event, 'isTrusted', { value: true });
+          
+          primaryTarget.dispatchEvent(event);
+          console.log(`✅ Sent ${eventConfig.type} ${key} (keyCode: ${eventConfig.options.keyCode}) to Google Docs`);
+          
+          // Also send to document for backup
+          win.document.dispatchEvent(event);
+          
+        } catch (e) {
+          console.log(`Failed to send ${eventConfig.type}:`, e);
+        }
+      }, index * 10); // 10ms delay between events
     });
     
-    try {
-      // Priority targets for Google Docs
-      const targets = [
-        win.document.querySelector('[role="textbox"]'),
-        win.document.querySelector('.kix-appview-editor'),
-        win.document.activeElement,
-        win.document.body,
-        win.document
-      ].filter(el => el);
-      
-      // Send to all targets to ensure event reaches the right handler
-      targets.forEach((target, index) => {
-        try {
-          target.dispatchEvent(keyEvent);
-          console.log(`Sent ${eventType} ${key} to target ${index}:`, target.tagName || target.constructor.name);
-        } catch (e) {
-          console.log(`Failed to send ${eventType} to target ${index}:`, e);
-        }
-      });
-      
-    } catch (error) {
-      console.log(`Failed to send ${eventType}:`, error);
-    }
-  });
+  } catch (error) {
+    console.log('Keyboard event error:', error);
+  }
 }
 
-// Apply formatting using the proven Google Docs method
+// Alternative approach: Try direct command execution
+function tryDirectCommands(win, styles) {
+  try {
+    const textbox = win.document.querySelector('[role="textbox"]');
+    if (textbox) {
+      // Try the execCommand approach on the iframe
+      if (styles.bold) {
+        win.document.execCommand('bold');
+        console.log('Tried execCommand bold on iframe');
+      }
+      if (styles.italic) {
+        win.document.execCommand('italic');
+        console.log('Tried execCommand italic on iframe');
+      }
+      if (styles.underline) {
+        win.document.execCommand('underline');
+        console.log('Tried execCommand underline on iframe');
+      }
+    }
+  } catch (e) {
+    console.log('Direct commands failed:', e);
+  }
+}
+
+// Apply formatting using multiple proven methods
 function applyFormatting(styles) {
-  console.log('🎯 Applying formatting with proven method:', styles);
+  console.log('🎯 Applying formatting with multiple proven methods:', styles);
   
   // Get the Google Docs iframe
   const win = getDocsIframe();
@@ -211,35 +280,40 @@ function applyFormatting(styles) {
     return false;
   }
   
-  // Shorter delays and immediate formatting application
+  // Multiple approaches in sequence
   setTimeout(() => {
     console.log('Applying formatting to current selection...');
     
     let applied = [];
     
-    // Apply all formatting simultaneously for better success rate
+    // Method 1: Synthetic keyboard events with proper sequence
     if (styles.bold) {
       sendSyntheticKeyEvent(win, 'b', 'KeyB', true);
       applied.push('bold');
     }
     
     if (styles.italic) {
-      sendSyntheticKeyEvent(win, 'i', 'KeyI', true);
+      setTimeout(() => sendSyntheticKeyEvent(win, 'i', 'KeyI', true), 50);
       applied.push('italic');
     }
     
     if (styles.underline) {
-      sendSyntheticKeyEvent(win, 'u', 'KeyU', true);
+      setTimeout(() => sendSyntheticKeyEvent(win, 'u', 'KeyU', true), 100);
       applied.push('underline');
     }
     
+    // Method 2: Try direct commands as fallback
+    setTimeout(() => {
+      tryDirectCommands(win, styles);
+    }, 200);
+    
     if (applied.length > 0) {
-      showNotification(`✅ Applied ${applied.join(', ')} formatting to selected text!`);
+      showNotification(`🚀 Sending ${applied.join(', ')} commands to Google Docs! Check your text.`);
     } else {
       showNotification('Select text in Google Docs first, then use the extension.', true);
     }
     
-  }, 200); // Single delay for focus settling
+  }, 300); // Longer delay for proper focus settling
   
   return true;
 }
