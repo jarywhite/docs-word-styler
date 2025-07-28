@@ -90,7 +90,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // Add debug button after the main button
+  // Add test formatting button
+  const testButton = document.createElement('button');
+  testButton.textContent = 'Test Bold (Selection)';
+  testButton.style.cssText = `
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    background: #ea4335;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  `;
+  testButton.addEventListener('click', async () => {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { action: 'testFormatting' });
+      alert('Bold formatting test sent! Check console and select text first.');
+    } catch (error) {
+      alert('Test failed: ' + error.message);
+    }
+  });
+
+  // Add both debug buttons after the main button
+  applyButton.parentNode.appendChild(testButton);
   applyButton.parentNode.appendChild(debugButton);
 
   // Allow Enter key to trigger formatting
